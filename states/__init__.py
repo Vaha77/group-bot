@@ -1,1 +1,1 @@
-from . import ads
+from . import send_ads
