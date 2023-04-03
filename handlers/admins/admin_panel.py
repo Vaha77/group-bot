@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+
 from aiogram import types
 from aiogram.types import CallbackQuery
 from aiogram.dispatcher import FSMContext
@@ -7,16 +9,22 @@ from aiogram.dispatcher import FSMContext
 from playhouse.shortcuts import model_to_dict
 
 from data.config import ADMINS, ADMINS_NAME
+from database.connections import add_user
+from keyboards.inline.for_admin import inc_dec
 from loader import dp, db, bot
 from keyboards.default.admins_menu import menu
 from aiogram.types import ReplyKeyboardRemove
+
+from states.add_admin import Add_Admin
 from states.send_ads import Advers
 from database.models import *
 from filters.private_chat import IsPrivate
 
+# ADMINS = [6202185692]
+# ADMINS_NAME = ["Muzaffar"]
 
 try:
-    @dp.message_handler(IsPrivate(), text="/admin", user_id=ADMINS)
+    @dp.message_handler(IsPrivate(), commands="admin", user_id=ADMINS)
     async def show_menu(msg: types.Message):
         await msg.answer(text=f'Xush kelibsiz {msg.from_user.full_name} - ADMIN', reply_markup=menu)
 
@@ -28,7 +36,7 @@ try:
         await bot.send_message(msg.from_user.id, text)
 
 
-    @dp.message_handler(text="👮🏼‍♂️ Adminlar", user_id=ADMINS)
+    @dp.message_handler(IsPrivate(),text="👮🏼‍♂️ Adminlar", user_id=ADMINS)
     async def show_admins(msg: types.Message):
         text = f"Botda {len(ADMINS)} ta admin bor:\n\n"
         num = 0
@@ -37,8 +45,44 @@ try:
             num += 1
             a += f"{num}. <a href='tg://user?id={ADMINS[i]}'>{ADMINS_NAME[i]} [{ADMINS[i]}]</a>\n"
         text += a
-        await bot.send_message(msg.from_user.id, text)
+        await bot.send_message(msg.from_user.id, text,reply_markup=inc_dec)
 
+    @dp.callback_query_handler(text_contains="admin:")
+    async def add_admin(call: CallbackQuery, state:FSMContext):
+        await call.answer(cache_time=60)
+        await call.message.delete()
+        t = await call.message.answer("Yangi Admin ning Telegram ID sini kiriting: ")
+        await state.update_data(
+            {"message_id":t.message_id}
+        )
+        await Add_Admin.admin_id.set()
+
+    @dp.message_handler(IsPrivate(),state=Add_Admin.admin_id)
+    async def get_id(msg: types.Message,state:FSMContext):
+        xabar = await msg.answer("Yangi Admin ning Ismini kiriting: ")
+        await state.update_data(
+            {"admin_id": msg.text,
+             "t":xabar.message_id}
+        )
+        await Add_Admin.admin_name.set()
+
+    @dp.message_handler(IsPrivate(),state=Add_Admin.admin_name)
+    async def get_admin_name(msg: types.Message, state:FSMContext):
+        await state.update_data(
+            {"admin_name":msg.text}
+        )
+        data = await state.get_data()
+        ADMINS.append(data["admin_id"])
+        ADMINS_NAME.append(data["admin_name"])
+        x1 = data["message_id"]
+        x2 = data["t"]
+        print(x1,x2)
+        await bot.delete_message(msg.chat.id,x1)
+        await bot.delete_message(msg.chat.id,x2)
+        await msg.answer("Yangi Admin qo'shildi.")
+        print(ADMINS)
+        print(ADMINS_NAME)
+        await state.finish()
 
     @dp.message_handler(IsPrivate(),text="📝 Xabar Yuborish", user_id=ADMINS)
     async def check_adver(msg: types.Message):
@@ -56,7 +100,6 @@ try:
         send_user = 0
         send_error = 0
         for user in users:
-            print(user)
             user_id = user["telegram_id"]
             try:
                 if text_type == 'sticker':
@@ -99,5 +142,10 @@ except:
 
 
 @dp.message_handler(commands="admin")
-async def check_admin(msg: types.Message):
-    await msg.answer(f"{msg.from_user.full_name}. Siz ADMIN emassiz 🧐.")
+async def check_admin(message: types.Message):
+    name = message.from_user.full_name
+    user_id = message.from_user.id
+    username = message.from_user.username
+    time_now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    await add_user(user_id, name, username, time_now)
+    await bot.send_message(message.from_user.id, f"{message.from_user.full_name}. Siz ADMIN emassiz 🧐.")
