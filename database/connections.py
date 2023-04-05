@@ -18,6 +18,16 @@ async def add_user(user_id,name,username,time_now):
             for user in ADMINS:
                 await bot.send_message(user, msg)
 
+async def add_admin(admin_id: int,admin_name: str,msg_id: int):
+    with db:
+        if not Admins.select().where(Admins.admin_id == admin_id).exists():
+            Admins.create(
+                admin_id=admin_id,
+                admin_name=admin_name
+            )
+            text = f"<a href='tg://user?id={admin_id}'>{admin_name}</a> Admin qilindi"
+            await bot.send_message(msg_id,text)
+
 async def add_channel(channel_id,title):
     with db:
         if not Channels.select().where(Channels.channel_id == channel_id).exists():

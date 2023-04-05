@@ -1,27 +1,33 @@
+# packages
 import asyncio
 import datetime
 
 from aiogram import types
 from aiogram.types import CallbackQuery
 from aiogram.dispatcher import FSMContext
-
-#local file
 from playhouse.shortcuts import model_to_dict
 
-from data.config import ADMINS, ADMINS_NAME
+#local file
 from database.connections import add_user
+from keyboards.inline.cancel import cancel
 from keyboards.inline.for_admin import inc_dec
 from loader import dp, db, bot
 from keyboards.default.admins_menu import menu
 from aiogram.types import ReplyKeyboardRemove
-
 from states.add_admin import Add_Admin
 from states.send_ads import Advers
 from database.models import *
+from database.connections import *
 from filters.private_chat import IsPrivate
 
-# ADMINS = [6202185692]
-# ADMINS_NAME = ["Muzaffar"]
+
+adm = Admins.select()
+aaa = [model_to_dict(item) for item in adm]
+ADMINS = []
+ADMINS_NAME = []
+for i in aaa:
+    ADMINS.append(i["admin_id"])
+    ADMINS_NAME.append(i["admin_name"])
 
 try:
     @dp.message_handler(IsPrivate(), commands="admin", user_id=ADMINS)
@@ -48,7 +54,7 @@ try:
         await bot.send_message(msg.from_user.id, text,reply_markup=inc_dec)
 
     @dp.callback_query_handler(text_contains="admin:")
-    async def add_admin(call: CallbackQuery, state:FSMContext):
+    async def add_adminaa(call: CallbackQuery, state:FSMContext):
         await call.answer(cache_time=60)
         await call.message.delete()
         t = await call.message.answer("Yangi Admin ning Telegram ID sini kiriting: ")
@@ -72,23 +78,26 @@ try:
             {"admin_name":msg.text}
         )
         data = await state.get_data()
-        ADMINS.append(data["admin_id"])
-        ADMINS_NAME.append(data["admin_name"])
+        admin_id = data["admin_id"]
+        admin_name = data["admin_name"]
+        print(admin_name,admin_id)
+        await add_admin(admin_id,admin_name,msg.from_user.id)
         x1 = data["message_id"]
         x2 = data["t"]
-        print(x1,x2)
         await bot.delete_message(msg.chat.id,x1)
         await bot.delete_message(msg.chat.id,x2)
-        await msg.answer("Yangi Admin qo'shildi.")
-        print(ADMINS)
-        print(ADMINS_NAME)
         await state.finish()
 
     @dp.message_handler(IsPrivate(),text="📝 Xabar Yuborish", user_id=ADMINS)
     async def check_adver(msg: types.Message):
-        await msg.answer("Xabarni yuboring:")
+        await msg.answer("Xabarni yuboring:",reply_markup=cancel)
         await Advers.text.set()
 
+    @dp.callback_query_handler(state=Advers.text, text="bekor_qilish_btn")
+    async def cancel_send_ads(call:CallbackQuery, state:FSMContext):
+        await call.answer("Xabar yuborish bekor qilindi.",show_alert=True)
+        await call.message.delete()
+        await state.finish()
 
     @dp.message_handler(IsPrivate(),state=Advers.text, content_types=['text', 'video', 'photo', 'audio', 'location'],
                         user_id=ADMINS)
@@ -137,11 +146,12 @@ try:
     @dp.message_handler(IsPrivate(),text="🔙 Chiqish", user_id=ADMINS)
     async def send_adver(msg: types.Message):
         await msg.answer("Siz ADMIN PANEL dan chiqdingiz", reply_markup=ReplyKeyboardRemove(True))
-except:
-    print('Bu foydalanuvchi admin emas')
+
+except Exception as err:
+    pass
 
 
-@dp.message_handler(commands="admin")
+@dp.message_handler(IsPrivate(),commands="admin")
 async def check_admin(message: types.Message):
     name = message.from_user.full_name
     user_id = message.from_user.id

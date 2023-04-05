@@ -23,4 +23,11 @@ class Channels(BaseModel):
     class Meta:
         db_name="Channels"
 
+class Admins(BaseModel):
+    admin_id=BigIntegerField(primary_key=True)
+    admin_name=CharField(max_length=250)
+
+    class Meta:
+        db_name="Admins"
+
 
