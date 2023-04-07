@@ -1,7 +1,7 @@
 # packages
 import asyncio
 import datetime
-
+import schedule
 from aiogram import types
 from aiogram.types import CallbackQuery
 from aiogram.dispatcher import FSMContext
@@ -21,13 +21,12 @@ from database.connections import *
 from filters.private_chat import IsPrivate
 
 
-adm = Admins.select()
-aaa = [model_to_dict(item) for item in adm]
 ADMINS = []
 ADMINS_NAME = []
-for i in aaa:
-    ADMINS.append(i["admin_id"])
-    ADMINS_NAME.append(i["admin_name"])
+def check_db_admin():
+
+
+schedule.every(5).seconds.do(check_db_admin)
 
 try:
     @dp.message_handler(IsPrivate(), commands="admin", user_id=ADMINS)
@@ -57,11 +56,18 @@ try:
     async def add_adminaa(call: CallbackQuery, state:FSMContext):
         await call.answer(cache_time=60)
         await call.message.delete()
-        t = await call.message.answer("Yangi Admin ning Telegram ID sini kiriting: ")
+        t = await call.message.answer("Yangi Admin ning Telegram ID sini kiriting: ",reply_markup=cancel)
         await state.update_data(
             {"message_id":t.message_id}
         )
         await Add_Admin.admin_id.set()
+
+    @dp.callback_query_handler(state=Add_Admin.admin_id,text="bekor_qilish_btn")
+    async def cancel_add_admin(call: CallbackQuery, state:FSMContext):
+        await call.answer("Admin qo'shish bekor qilindi.", show_alert=True)
+        await call.message.delete()
+        await state.finish()
+
 
     @dp.message_handler(IsPrivate(),state=Add_Admin.admin_id)
     async def get_id(msg: types.Message,state:FSMContext):
@@ -159,3 +165,4 @@ async def check_admin(message: types.Message):
     time_now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     await add_user(user_id, name, username, time_now)
     await bot.send_message(message.from_user.id, f"{message.from_user.full_name}. Siz ADMIN emassiz 🧐.")
+
